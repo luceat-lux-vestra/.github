@@ -54,6 +54,13 @@ class FailureClassifierTests(unittest.TestCase):
         ]
         self.assertEqual(module._latest_runs(runs, set()), [])
 
+    def test_safe_text_strips_multiline_markup_and_bounds_length(self):
+        value = module.safe_text("evil|name\\n<script>" + "x" * 300)
+        self.assertNotIn("\\n", value)
+        self.assertNotIn("<", value)
+        self.assertIn("\\\\|", value)
+        self.assertLessEqual(len(value), 160)
+
     def test_report_states_fail_closed(self):
         finding = module.classify_failure("Build", "test", "unit tests", "AssertionError")
         record = module.FailureRecord("Build", 1, "https://example.invalid", "failure", "test", "unit tests", finding)
