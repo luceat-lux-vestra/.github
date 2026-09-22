@@ -147,7 +147,11 @@ class GitHubApi:
                     tail.extend(chunk)
                     if len(tail) > 384 * 1024:
                         del tail[:-384 * 1024]
-                raw = bytes(head) + (b"\n...[log truncated]...\n" if total > MAX_LOG_BYTES else b"") + bytes(tail)
+                if total > MAX_LOG_BYTES:
+                    raw = bytes(head) + b"\n...[log truncated]...\n" + bytes(tail)
+                else:
+                    overlap = max(0, len(head) + len(tail) - total)
+                    raw = bytes(head) + bytes(tail[overlap:])
                 return raw.decode("utf-8", errors="replace")
         except (urllib.error.HTTPError, urllib.error.URLError):
             return ""
@@ -215,6 +219,15 @@ def collect_records(api: GitHubApi, runs: list[dict]) -> tuple[list[FailureRecor
     return records, pending
 
 
+def safe_text(value: str, limit: int = 160) -> str:
+    value = re.sub(r"[\r\n\t]+", " ", value or "")
+    value = re.sub(r"[<>]", "", value)
+    value = value.replace("|", "\\|").strip()
+    if len(value) > limit:
+        value = value[: limit - 1] + "…"
+    return value or "<unnamed>"
+
+
 def render_report(head_sha: str, records: list[FailureRecord], pending: list[str]) -> str:
     state = "BLOCKED" if records else ("PENDING" if pending else "CLEAR")
     lines = [
@@ -232,17 +245,18 @@ def render_report(head_sha: str, records: list[FailureRecord], pending: list[str
             "|---|---|---|---|",
         ])
         for record in records:
-            workflow = f"[{record.workflow_name}]({record.run_url})" if record.run_url else record.workflow_name
-            job_step = f"{record.job_name} / {record.step_name}".replace("|", "\\|")
+            workflow_name = safe_text(record.workflow_name)
+            workflow = f"[{workflow_name}]({record.run_url})" if record.run_url else workflow_name
+            job_step = f"{safe_text(record.job_name)} / {safe_text(record.step_name)}"
             lines.append(
                 f"| {workflow} | {job_step} | `{record.finding.classification}` | `{record.finding.decision}` |"
             )
         lines.append("")
         for index, record in enumerate(records, start=1):
             lines.extend([
-                f"### {index}. {record.workflow_name} — {record.job_name}",
+                f"### {index}. {safe_text(record.workflow_name)} — {safe_text(record.job_name)}",
                 "",
-                f"- **Observed:** `{record.conclusion}` at `{record.step_name}`.",
+                f"- **Observed:** `{safe_text(record.conclusion)}` at `{safe_text(record.step_name)}`.",
                 f"- **Classification:** `{record.finding.classification}`.",
                 f"- **Decision:** `{record.finding.decision}`.",
             ])
@@ -257,7 +271,7 @@ def render_report(head_sha: str, records: list[FailureRecord], pending: list[str
         lines.append("")
 
     if pending:
-        lines.append("**Pending workflows:** " + ", ".join(f"`{item}`" for item in sorted(set(pending))) + ".")
+        lines.append("**Pending workflows:** " + ", ".join(f"`{safe_text(item)}`" for item in sorted(set(pending))) + ".")
         lines.append("")
 
     lines.extend([
