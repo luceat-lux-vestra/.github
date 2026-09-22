@@ -28,8 +28,8 @@ SENTINELS = {
 }
 TRUSTED_BOT_LOGINS = {"dependabot[bot]"}
 UNRESOLVED_ROOT = re.compile(
-    r"(?i)^\\s*(?:(?:the\\s+)?(?:root\\s+cause|cause|reason)\\s*(?:is|remains|[:=])\\s*)?"
-    r"(?:still\\s+)?(?:unknown|unverified|tbd|todo|insufficient\\s+evidence)\\b"
+    r"(?i)^\s*(?:(?:the\s+)?(?:root\s+cause|cause|reason)\s*(?:is|remains|[:=])\s*)?"
+    r"(?:still\s+)?(?:unknown|unverified|tbd|todo|insufficient\s+evidence)\b"
 )
 
 
@@ -43,7 +43,7 @@ def clean(value: str) -> str:
 
 
 def checked(block: str, label: str) -> bool:
-    pattern = rf"(?im)^\\s*-\\s*\\[(?P<mark>[ xX])\\]\\s*{re.escape(label)}\\s*$"
+    pattern = rf"(?im)^\s*-\s*\[(?P<mark>[ xX])\]\s*{re.escape(label)}\s*$"
     matches = list(re.finditer(pattern, block))
     if len(matches) != 1:
         raise TriageError(f"expected exactly one checkbox for: {label}")
@@ -53,7 +53,7 @@ def checked(block: str, label: str) -> bool:
 def field_values(block: str) -> dict[str, str]:
     matches: dict[str, re.Match[str]] = {}
     for field in FIELDS:
-        found = list(re.finditer(rf"(?m)^{re.escape(field)}:\\s*$", block))
+        found = list(re.finditer(rf"(?m)^{re.escape(field)}:\s*$", block))
         if len(found) != 1:
             raise TriageError(f"expected exactly one '{field}:' field")
         matches[field] = found[0]
