@@ -1,0 +1,32 @@
+name: CI failure classifier
+description: Rebuild a fail-closed CI failure classification report for the current pull request HEAD.
+inputs:
+  github-token:
+    description: Repository GITHUB_TOKEN with actions:read, pull-requests:read, and issues:write.
+    required: true
+  tracked-workflows:
+    description: Optional newline-delimited exact workflow names to include. Empty means all non-classifier workflows on the HEAD.
+    required: false
+    default: ""
+  comment:
+    description: Whether to upsert the pull request report comment.
+    required: false
+    default: "true"
+outputs:
+  state:
+    description: clear, pending, or blocked.
+    value: ${{ steps.classify.outputs.state }}
+  active-failures:
+    description: Number of active failed jobs classified for the exact HEAD.
+    value: ${{ steps.classify.outputs.active-failures }}
+runs:
+  using: composite
+  steps:
+    - id: classify
+      name: Rebuild exact-HEAD failure classification
+      shell: bash
+      env:
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INPUT_TRACKED_WORKFLOWS: ${{ inputs.tracked-workflows }}
+        INPUT_COMMENT: ${{ inputs.comment }}
+      run: python3 "$GITHUB_ACTION_PATH/classify.py"
