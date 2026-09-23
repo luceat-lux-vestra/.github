@@ -2,7 +2,7 @@ name: CI failure classifier
 description: Rebuild a fail-closed CI failure classification report for the current pull request HEAD.
 inputs:
   github-token:
-    description: Repository GITHUB_TOKEN with actions:read, pull-requests:read, and issues:write.
+    description: Repository GITHUB_TOKEN with actions:read and pull-requests:write; the write scope is used only to upsert the sticky PR report.
     required: true
   tracked-workflows:
     description: Optional newline-delimited exact workflow names to include. Empty means all non-classifier workflows on the HEAD.
