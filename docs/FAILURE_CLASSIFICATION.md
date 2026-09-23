@@ -26,6 +26,7 @@ The failure-classification system separates observation, classification, and rem
 - `AUTO_PROVEN`: deterministic evidence establishes one canonical classification.
 - `CANDIDATE`: evidence narrows the plausible responsibility layers, but more than one remains.
 - `UNKNOWN`: machine evidence does not materially narrow the responsibility layer.
+- A GitHub Actions `startup_failure` is recorded as `UNKNOWN / CANDIDATE` with workflow-policy drift and environment failure as unresolved candidates; absence of a created job is not treated as root-cause proof.
 
 ## Report surfaces
 
