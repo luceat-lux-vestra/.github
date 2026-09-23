@@ -12,7 +12,7 @@ from typing import Iterable
 
 MARKER = "<!-- failure-classification:v1 -->"
 MAX_LOG_BYTES = 512 * 1024
-FAILURE_CONCLUSIONS = {"failure", "timed_out", "action_required"}
+FAILURE_CONCLUSIONS = {"failure", "timed_out", "action_required", "startup_failure"}
 AUTO_PROVEN = "AUTO_PROVEN"
 CANDIDATE = "CANDIDATE"
 UNKNOWN = "UNKNOWN"
@@ -95,6 +95,16 @@ def classify_failure(workflow_name: str, job_name: str, step_name: str, log_text
     )
 
 
+def classify_startup_failure() -> Finding:
+    return Finding(
+        classification="UNKNOWN",
+        decision=CANDIDATE,
+        rule=None,
+        basis="The workflow failed before any job started, so workflow/policy loading and execution-environment causes remain unresolved.",
+        candidates=("workflow-policy drift", "environment failure"),
+    )
+
+
 class GitHubApi:
     def __init__(self, repository: str, token: str, api_url: str = "https://api.github.com") -> None:
         self.repository = repository
@@ -109,11 +119,20 @@ class GitHubApi:
         request.add_header("Authorization", f"Bearer {self.token}")
         request.add_header("X-GitHub-Api-Version", "2022-11-28")
         request.add_header("User-Agent", "luceat-lux-vestra-failure-classifier")
-        with urllib.request.urlopen(request, timeout=30) as response:
-            raw = response.read()
-            if not raw:
-                return None
-            return json.loads(raw.decode("utf-8"))
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                raw = response.read()
+                if not raw:
+                    return None
+                return json.loads(raw.decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read(2048).decode("utf-8", errors="replace")
+            detail = re.sub(r"[\\r\\n\\t]+", " ", detail).strip()
+            if len(detail) > 1000:
+                detail = detail[:999] + "…"
+            raise RuntimeError(
+                f"GitHub API {method} {path} failed: HTTP {exc.code}" + (f": {detail}" if detail else "")
+            ) from exc
 
     def get(self, path: str):
         return self._request("GET", path)
@@ -196,7 +215,9 @@ def collect_records(api: GitHubApi, runs: list[dict]) -> tuple[list[FailureRecor
         jobs_doc = api.get(f"/repos/{api.repository}/actions/runs/{run['id']}/jobs?filter=latest&per_page=100") or {}
         failed_jobs = [job for job in jobs_doc.get("jobs", []) if job.get("conclusion") in FAILURE_CONCLUSIONS]
         if not failed_jobs:
-            finding = classify_failure(name, "<workflow>", "<workflow failure>", "")
+            finding = classify_startup_failure() if conclusion == "startup_failure" else classify_failure(
+                name, "<workflow>", "<workflow failure>", ""
+            )
             records.append(
                 FailureRecord(name, int(run["id"]), run.get("html_url") or "", conclusion, "<workflow>", "<workflow failure>", finding)
             )
