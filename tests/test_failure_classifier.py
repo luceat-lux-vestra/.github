@@ -40,6 +40,13 @@ class FailureClassifierTests(unittest.TestCase):
         self.assertEqual(finding.classification, "UNKNOWN")
         self.assertEqual(finding.decision, module.UNKNOWN)
 
+    def test_startup_failure_remains_fail_closed_candidate(self):
+        finding = module.classify_startup_failure()
+        self.assertIn("startup_failure", module.FAILURE_CONCLUSIONS)
+        self.assertEqual(finding.classification, "UNKNOWN")
+        self.assertEqual(finding.decision, module.CANDIDATE)
+        self.assertEqual(set(finding.candidates), {"workflow-policy drift", "environment failure"})
+
     def test_latest_run_wins_for_same_workflow(self):
         runs = [
             {"workflow_id": 1, "name": "Build", "run_number": 10, "run_attempt": 1, "event": "pull_request"},
